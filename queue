@@ -1,0 +1,93 @@
+import queue
+import random
+import time
+import threading
+
+class Queue:
+    def __init__(self):
+        self.elements = queue.Queue()
+
+    def enqueue(self, item):
+        self.elements.put(item)
+
+    def dequeue(self):
+        return self.elements.get()
+
+    def is_empty(self):
+        return self.elements.empty()
+
+def new_customer_arrives():
+    # Randomly determine if a new customer arrives (e.g., 1 in 5 chance per iteration)
+    return random.random() < 0.2
+
+def new_customer(counter):
+    # Create a new customer with an ID
+    return f"customer_{counter}"
+
+def start_checkout(customer, machine_index, completion_counter, stop_event):
+    # Simulate the start of checkout process
+    print(f"{customer} starts checkout at machine {machine_index}")
+    time.sleep(random.uniform(1, 3))  # Simulate the time taken for checkout
+    print(f"{customer} completes checkout at machine {machine_index}")
+    completion_counter['count'] += 1
+    if completion_counter['count'] >= 10:
+        stop_event.set()
+
+def checkout_complete(machine_status, machine_index):
+    # Check if the machine is available
+    return machine_status[machine_index - 1]
+
+def customer_needs_assistance():
+    # Randomly determine if a customer needs assistance (e.g., 1 in 20 chance per iteration)
+    return random.random() < 0.05
+
+def assist_customer(cashier):
+    # Simulate assistance
+    print("Cashier assists a customer")
+
+def self_checkout_system(num_machines, stop_event, completion_counter):
+    Q = Queue()  # Queue for customers
+    machines = [True] * num_machines  # True if machine is available, False if busy
+    cashier = "available"
+    customer_counter = 1
+
+    def process_checkout(customer, machine_index):
+        start_checkout(customer, machine_index, completion_counter, stop_event)
+        machines[machine_index - 1] = True  # Mark machine as available after checkout is complete
+
+    while not stop_event.is_set():
+        # Simulate the passage of time in each iteration
+        time.sleep(1)
+
+        if new_customer_arrives():
+            customer = new_customer(customer_counter)
+            Q.enqueue(customer)
+            customer_counter += 1
+            print(f"{customer} arrives and joins the queue")
+
+        machine_indices = list(range(1, num_machines + 1))
+        random.shuffle(machine_indices)  # Shuffle the order of machines
+
+        for i in machine_indices:
+            if machines[i - 1] and not Q.is_empty():
+                customer = Q.dequeue()
+                machines[i - 1] = False  # Mark machine as busy
+                threading.Thread(target=process_checkout, args=(customer, i)).start()
+
+        if customer_needs_assistance():
+            assist_customer(cashier)
+
+# Create a threading event for stopping the simulation
+stop_event = threading.Event()
+
+# Counter for completed checkouts
+completion_counter = {'count': 0}
+
+# Start the self-checkout system in a separate thread
+checkout_thread = threading.Thread(target=self_checkout_system, args=(4, stop_event, completion_counter))
+checkout_thread.start()
+
+# Wait for the checkout thread to finish
+checkout_thread.join()
+
+print("Simulation has stopped.")
